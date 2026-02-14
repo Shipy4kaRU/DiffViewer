@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 
 import {
   parseDiff,
@@ -9,14 +9,7 @@ import {
   isInsert,
   useTokenizeWorker,
 } from "react-diff-view";
-import type {
-  HunkData,
-  FileData,
-  ViewType,
-  HunkTokens,
-  RenderToken,
-} from "react-diff-view";
-import { Comment } from "./Comment/Comment";
+import type { HunkData, FileData, ViewType, HunkTokens } from "react-diff-view";
 
 import styles from "./DiffFile.module.css";
 import "react-diff-view/style/index.css";
@@ -24,36 +17,10 @@ import "react-diff-view/style/index.css";
 import "prism-color-variables/variables.css";
 import { DiffFileHeader } from "./DiffFileHeader";
 import { getTokenizeWorker } from "./tokenizeDiff";
+import { createRenderToken } from "./createRenderToken";
 
 type DiffFileProps = {
   diff: string;
-};
-
-const renderToken: RenderToken = (token, defaultRender, i) => {
-  if (token.type === "indent-guide") {
-    return (
-      <span key={i} className={styles.indentGuide}>
-        {token.children?.map((child, j) =>
-          renderToken(child, defaultRender, j)
-        )}
-      </span>
-    );
-  }
-
-  if (token.type === "line-comment") {
-    const changeType = (token as { changeType?: "insert" | "delete" })
-      .changeType;
-
-    return (
-      <span key={i} className={styles.lineCommentWrap}>
-        {changeType != null && <Comment type={changeType} />}
-        {token.children?.map((child, j) =>
-          renderToken(child, defaultRender, j)
-        )}
-      </span>
-    );
-  }
-  return defaultRender(token, i);
 };
 
 const renderHunk = (hunk: HunkData) => (
@@ -89,14 +56,46 @@ type RenderFileProps = FileData & {
   tokens: HunkTokens | null;
 };
 
-const renderFile = ({
+type DiffFileContentProps = RenderFileProps & {};
+
+const DiffFileContent = ({
   oldRevision,
   newRevision,
   type,
   hunks = [],
   viewType,
-  tokens,
-}: RenderFileProps) => {
+  newPath,
+}: DiffFileContentProps) => {
+  const [comments, setComments] = useState({});
+  const tokenizeWorker = useMemo(() => getTokenizeWorker(), []);
+  const tokenizePayload = useMemo(
+    () => ({
+      hunks: hunks,
+      oldSource: null,
+      language: getFileExtension(newPath),
+    }),
+    [hunks, newPath]
+  );
+  const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
+
+  const addComment = useCallback((key: string) => {
+    setComments((prev) => ({
+      ...prev,
+      [key]: (
+        <div className="my-widget">
+          <h4>Комментарий к строке</h4>
+          <textarea />
+          <button onClick={() => console.log("closing")}>Закрыть</button>
+        </div>
+      ),
+    }));
+  }, []);
+
+  const renderToken = useMemo(
+    () => createRenderToken({ addComment }),
+    [addComment]
+  );
+
   return (
     <Diff
       key={`${oldRevision}-${newRevision}`}
@@ -107,6 +106,7 @@ const renderFile = ({
       renderToken={renderToken}
       optimizeSelection
       className={styles.diff}
+      widgets={comments}
     >
       {(hunks) => hunks.map(renderHunk)}
     </Diff>
@@ -126,17 +126,6 @@ export const DiffFile = ({ diff }: DiffFileProps) => {
 
   console.log("[DiffFile] file: ", file);
 
-  const tokenizeWorker = useMemo(() => getTokenizeWorker(), []);
-  const tokenizePayload = useMemo(
-    () => ({
-      hunks: file.hunks,
-      oldSource: null,
-      language: getFileExtension(file.newPath),
-    }),
-    [file.hunks, file.newPath]
-  );
-  const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
-
   const count = useMemo(() => countDiffLines(file.hunks), [file.hunks]);
 
   console.log("[DiffFile] count: ", count);
@@ -150,11 +139,11 @@ export const DiffFile = ({ diff }: DiffFileProps) => {
         setSplit={() => setIsSplit(true)}
         setUnified={() => setIsSplit(false)}
       />
-      {renderFile({
-        ...file,
-        viewType: isSplit ? "split" : "unified",
-        tokens,
-      })}
+      <DiffFileContent
+        {...file}
+        viewType={isSplit ? "split" : "unified"}
+        tokens={null}
+      />
     </div>
   );
 };

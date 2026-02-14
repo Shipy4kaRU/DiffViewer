@@ -6,13 +6,20 @@ import {
   isDelete,
   isInsert,
 } from "react-diff-view";
-import type { RangeTokenNode, TokenizeEnhancer } from "react-diff-view";
+import type {
+  ChangeData,
+  RangeTokenNode,
+  TokenizeEnhancer,
+} from "react-diff-view";
 
 const LINE_COMMENT_TYPE = "line-comment";
 
 type ChangeType = "insert" | "delete";
 
-type LineCommentRange = RangeTokenNode & { changeType: ChangeType };
+type LineCommentRange = RangeTokenNode & {
+  changeType: ChangeType;
+  properties: { change: ChangeData };
+};
 
 export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
   const oldRanges: LineCommentRange[] = [];
@@ -27,6 +34,7 @@ export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
           start: 0,
           length: 1,
           changeType: "delete",
+          properties: { change },
         });
       } else if (isInsert(change)) {
         newRanges.push({
@@ -35,6 +43,7 @@ export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
           start: 0,
           length: 1,
           changeType: "insert",
+          properties: { change },
         });
       }
     }
