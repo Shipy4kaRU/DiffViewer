@@ -1,0 +1,35 @@
+.diff {
+  --diff-code-insert-background-color: rgb(224, 255, 233);
+  --diff-gutter-insert-background-color: rgb(158, 250, 175);
+  --diff-code-insert-text-color: rgba(6, 10, 12, 0.96);
+  --diff-code-insert-edit-background-color: rgb(158, 250, 175);
+  --diff-code-delete-background-color: rgb(255, 224, 227);
+  --diff-gutter-delete-background-color: rgb(254, 179, 187);
+  --diff-code-delete-text-color: rgba(6, 10, 12, 0.96);
+  --diff-code-delete-edit-background-color: rgb(254, 179, 187);
+
+  /* prisma цвета */
+  --code-highlight-keyword-color: rgb(21, 73, 171);
+  --code-highlight-builtin-color: rgb(16, 142, 38);
+  --code-highlight-attr-2f9c0a-color: rgb(16, 142, 38);
+
+  /* Шрифт */
+  --diff-font-family: "SB Sans Text Mono", monospace;
+
+  font-size: 13px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.decoration {
+  background-color: rgb(207, 236, 255);
+  color: rgba(19, 24, 27, 0.56);
+}
+
+.decoration td {
+  padding: 7px 16px !important;
+  font-size: 12px;
+}

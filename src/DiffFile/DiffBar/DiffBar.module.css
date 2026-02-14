@@ -1,0 +1,29 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.bar {
+  display: flex;
+  height: 8px;
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #e5e7eb; /* нейтральный фон */
+}
+
+.deleted {
+  background: #ef4444; /* красный */
+  transition: width 0.3s ease;
+}
+
+.inserted {
+  background: #22c55e; /* зелёный */
+  transition: width 0.3s ease;
+}
