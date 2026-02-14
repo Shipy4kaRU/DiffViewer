@@ -1,5 +1,8 @@
 import { type HunkData, markEdits, tokenize, markWord } from "react-diff-view";
 import refractor from "refractor";
+import { markIndentGuides } from "./markIndentGuides";
+import { injectEmptyLinePlaceholders } from "./injectEmptyLinePlaceholders";
+import { markLineComments } from "./markLineComments";
 
 export type TokenizePayload = {
   hunks: HunkData[];
@@ -28,13 +31,16 @@ export const tokenizeDiff = (hunks: HunkData[], lang: string) => {
   }
 
   const options = {
-    highlight: true, // Включаем подсветку синтаксиса
+    highlight: lang !== "txt", // Включаем подсветку синтаксиса
     refractor, // Передаем библиотеку-парсер
     language: lang, // Указываем язык
     // oldSource: oldCode, (Опциональное) Полный исходник для точности (чтобы библиотека смогла точнее определить различия построчно)
     enhancers: [
       markEdits(hunks), // Добавляем вычисление inline-различий
       markWord("\t", "tab"), // Помечаем табуляцию
+      markIndentGuides(hunks, { indentSize: 4 }), // Полосы вложенности через pickRanges
+      injectEmptyLinePlaceholders(hunks), // Пустые +/- строки: подставляем placeholder для Comment
+      markLineComments(hunks), // Маркер Comment перед каждой строкой +/- (только insert/delete)
     ],
   };
 

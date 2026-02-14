@@ -10,6 +10,7 @@
 
   /* prisma цвета */
   --code-highlight-keyword-color: rgb(21, 73, 171);
+  --code-highlight-atrule-color: rgb(21, 73, 171);
   --code-highlight-builtin-color: rgb(16, 142, 38);
   --code-highlight-attr-2f9c0a-color: rgb(16, 142, 38);
 
@@ -32,4 +33,37 @@
 .decoration td {
   padding: 7px 16px !important;
   font-size: 12px;
+}
+
+/* gutter */
+.gutter {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Полосы вложенности (indent guides) — вертикальные линии как в редакторах */
+.indentGuide {
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.indentGuide::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  border-left: 1px solid rgba(6, 10, 12, 0.12);
+  pointer-events: none;
+}
+
+/* Обёртка: Comment ( +/- ) перед первым символом строки insert/delete */
+
+.lineCommentWrap {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: top;
+  gap: 8px;
 }

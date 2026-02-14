@@ -5,9 +5,18 @@ import {
   Diff,
   Hunk,
   Decoration,
+  isDelete,
+  isInsert,
   useTokenizeWorker,
 } from "react-diff-view";
-import type { HunkData, FileData, ViewType, HunkTokens } from "react-diff-view";
+import type {
+  HunkData,
+  FileData,
+  ViewType,
+  HunkTokens,
+  RenderToken,
+} from "react-diff-view";
+import { Comment } from "./Comment/Comment";
 
 import styles from "./DiffFile.module.css";
 import "react-diff-view/style/index.css";
@@ -18,6 +27,33 @@ import { getTokenizeWorker } from "./tokenizeDiff";
 
 type DiffFileProps = {
   diff: string;
+};
+
+const renderToken: RenderToken = (token, defaultRender, i) => {
+  if (token.type === "indent-guide") {
+    return (
+      <span key={i} className={styles.indentGuide}>
+        {token.children?.map((child, j) =>
+          renderToken(child, defaultRender, j)
+        )}
+      </span>
+    );
+  }
+
+  if (token.type === "line-comment") {
+    const changeType = (token as { changeType?: "insert" | "delete" })
+      .changeType;
+
+    return (
+      <span key={i} className={styles.lineCommentWrap}>
+        {changeType != null && <Comment type={changeType} />}
+        {token.children?.map((child, j) =>
+          renderToken(child, defaultRender, j)
+        )}
+      </span>
+    );
+  }
+  return defaultRender(token, i);
 };
 
 const renderHunk = (hunk: HunkData) => (
@@ -40,8 +76,8 @@ const countDiffLines = (hunks: HunkData[]) => {
 
   for (const hunk of hunks) {
     for (const change of hunk.changes) {
-      if (change.type === "delete") deleted++;
-      else if (change.type === "insert") inserted++;
+      if (isDelete(change)) deleted++;
+      else if (isInsert(change)) inserted++;
     }
   }
 
@@ -68,6 +104,7 @@ const renderFile = ({
       diffType={type}
       hunks={hunks}
       tokens={tokens}
+      renderToken={renderToken}
       optimizeSelection
       className={styles.diff}
     >
