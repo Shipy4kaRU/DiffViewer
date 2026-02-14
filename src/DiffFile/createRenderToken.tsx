@@ -4,10 +4,12 @@ import { NewComment } from "./Comment/Comment";
 import { getChangeKey } from "react-diff-view";
 
 type CreateRenderTokenProps = {
-  addComment: (key: string) => void;
+  handleNewComment: (key: string) => void;
 };
 
-export const createRenderToken = ({ addComment }: CreateRenderTokenProps) => {
+export const createRenderToken = ({
+  handleNewComment,
+}: CreateRenderTokenProps) => {
   const renderToken: RenderToken = (token, defaultRender, i) => {
     if (token.type === "indent-guide") {
       return (
@@ -29,7 +31,7 @@ export const createRenderToken = ({ addComment }: CreateRenderTokenProps) => {
             <NewComment
               type={changeType}
               id={getChangeKey(token.properties.change)}
-              onClick={addComment}
+              onClick={handleNewComment}
             />
           )}
           {token.children?.map((child, j) =>

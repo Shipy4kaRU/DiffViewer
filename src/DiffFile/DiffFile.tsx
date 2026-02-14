@@ -18,6 +18,8 @@ import "prism-color-variables/variables.css";
 import { DiffFileHeader } from "./DiffFileHeader";
 import { getTokenizeWorker } from "./tokenizeDiff";
 import { createRenderToken } from "./createRenderToken";
+import { LineWidget } from "./DiffWidget";
+import type { CommentProps } from "./Comment/Comment";
 
 type DiffFileProps = {
   diff: string;
@@ -66,7 +68,12 @@ const DiffFileContent = ({
   viewType,
   newPath,
 }: DiffFileContentProps) => {
-  const [comments, setComments] = useState({});
+  const [commentsData, setCommentsData] = useState<
+    Record<string, CommentProps[]>
+  >({});
+  const [activeAddForms, setActiveAddForms] = useState<Record<string, boolean>>(
+    {}
+  );
   const tokenizeWorker = useMemo(() => getTokenizeWorker(), []);
   const tokenizePayload = useMemo(
     () => ({
@@ -78,22 +85,63 @@ const DiffFileContent = ({
   );
   const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
 
-  const addComment = useCallback((key: string) => {
-    setComments((prev) => ({
+  console.log("[DiffFileContent] commentsData: ", commentsData);
+  console.log("[DiffFileContent] activeAddForms: ", activeAddForms);
+
+  const handleNewComment = useCallback((key: string) => {
+    setActiveAddForms((prev) => ({
       ...prev,
-      [key]: (
-        <div className="my-widget">
-          <h4>Комментарий к строке</h4>
-          <textarea />
-          <button onClick={() => console.log("closing")}>Закрыть</button>
-        </div>
-      ),
+      [key]: true,
     }));
   }, []);
 
+  const handleAddComment = useCallback((key: string, content: string) => {
+    setCommentsData((prev) => ({
+      ...prev,
+      [key]: [
+        ...(prev[key] || []),
+        { changeKey: key, content, time: new Date() },
+      ],
+    }));
+  }, []);
+
+  const handleCloseForm = useCallback((key: string) => {
+    setActiveAddForms((prev) => ({
+      ...prev,
+      [key]: false,
+    }));
+  }, []);
+
+  const widgets = useMemo(() => {
+    const allKeys = new Set([
+      ...Object.keys(commentsData),
+      ...Object.keys(activeAddForms),
+    ]);
+
+    return Array.from(allKeys).reduce((acc, key) => {
+      acc[key] = (
+        <LineWidget
+          changeKey={key}
+          comments={commentsData[key] || []}
+          showAddForm={!!activeAddForms[key]}
+          onClose={handleCloseForm}
+          onSave={handleAddComment}
+          onNewComment={handleNewComment}
+        />
+      );
+      return acc;
+    }, {});
+  }, [
+    commentsData,
+    activeAddForms,
+    handleCloseForm,
+    handleAddComment,
+    handleNewComment,
+  ]);
+
   const renderToken = useMemo(
-    () => createRenderToken({ addComment }),
-    [addComment]
+    () => createRenderToken({ handleNewComment }),
+    [handleNewComment]
   );
 
   return (
@@ -106,7 +154,7 @@ const DiffFileContent = ({
       renderToken={renderToken}
       optimizeSelection
       className={styles.diff}
-      widgets={comments}
+      widgets={widgets}
     >
       {(hunks) => hunks.map(renderHunk)}
     </Diff>

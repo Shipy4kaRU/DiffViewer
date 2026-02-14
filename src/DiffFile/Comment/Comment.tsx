@@ -1,3 +1,4 @@
+import { useState } from "react";
 import styles from "./Comment.module.css";
 import { type ChangeType } from "react-diff-view";
 
@@ -16,35 +17,47 @@ export const NewComment = ({ type, id, onClick }: NewCommentProps) => {
 };
 
 type AddCommentProps = {
-  type: ChangeType;
-  id: string;
-  onClick: (id: string) => void;
+  onSave: (text: string) => void;
+  onCancel: () => void;
 };
 
-export const AddComment = () => {
+export const AddCommentForm = ({ onSave, onCancel }: AddCommentProps) => {
+  const [content, setContent] = useState("");
+
+  const handleSave = () => {
+    onSave(content);
+    onCancel();
+  };
+
   return (
     <div className="my-widget">
       <h4>Комментарий к строке</h4>
-      <textarea />
-      <button onClick={() => console.log("closing")}>Закрыть</button>
+      <textarea value={content} onChange={(e) => setContent(e.target.value)} />
+      <button onClick={handleSave}>Сохранить</button>
+      <button onClick={onCancel}>Закрыть</button>
     </div>
   );
 };
 
-type CommentProps = {
-  id: string;
-  onClick: (id: string) => void;
+export type CommentProps = {
+  changeKey: string;
+  content: string;
+  time: Date;
+  onNewComment: (changeKey: string) => void;
 };
 
-export const Comments = ({ id, onClick }: CommentProps) => {
+export const Comment = ({
+  changeKey,
+  content,
+  time,
+  onNewComment,
+}: CommentProps) => {
   return (
     <div className={styles.comments}>
-      <ul>
-        <li>
-          <button onClick={() => onClick(id)}>Новый комментарий</button>
-        </li>
-      </ul>
-      <button onClick={() => onClick(id)}>Новый комментарий</button>
+      <p>KEY: {changeKey}</p>
+      <p>CONTENT: {content}</p>
+      <p>TIME: {time.toLocaleString()}</p>
+      <button onClick={() => onNewComment(changeKey)}>Новый комментарий</button>
     </div>
   );
 };
