@@ -53,9 +53,8 @@ export const DiffFile = ({ diff }: DiffFileProps) => {
           setUnified={() => setIsSplit(false)}
         />
         <DiffFileContent
-          {...file}
+          diffFile={file}
           viewType={isSplit ? "split" : "unified"}
-          tokens={null}
         />
       </div>
     </CommentsProvider>

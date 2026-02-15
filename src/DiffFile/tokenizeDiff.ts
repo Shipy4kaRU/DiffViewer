@@ -4,12 +4,6 @@ import { markIndentGuides } from "./markIndentGuides";
 import { injectEmptyLinePlaceholders } from "./injectEmptyLinePlaceholders";
 import { markLineComments } from "./markLineComments";
 
-export type TokenizePayload = {
-  hunks: HunkData[];
-  oldSource: string | null;
-  language?: string;
-};
-
 let workerInstance: Worker | null = null;
 
 export const getTokenizeWorker = (): Worker => {
@@ -23,25 +17,32 @@ export const getTokenizeWorker = (): Worker => {
   return workerInstance;
 };
 
-export const tokenizeDiff = (hunks: HunkData[], lang: string) => {
+export const tokenizeDiff = (
+  hunks: HunkData[],
+  lang: string,
+  enableComments: boolean
+) => {
   console.log("[tokenizeDiff] hunks: ", hunks);
 
   if (!hunks.length) {
     return undefined;
   }
 
+  const enhancers = [
+    markEdits(hunks), // Вычисление inline-различий
+    markWord("\t", "tab"), // Помечаем табуляцию
+    ...(enableComments
+      ? [injectEmptyLinePlaceholders(hunks), markLineComments(hunks)] // Пустые +/- строки: подставляем placeholder для Comment и маркер +/-
+      : []),
+    markIndentGuides(hunks, { indentSize: 4 }), // Полосы вложенности
+  ];
+
   const options = {
     highlight: lang !== "txt", // Включаем подсветку синтаксиса
     refractor, // Передаем библиотеку-парсер
     language: lang, // Указываем язык
     // oldSource: oldCode, (Опциональное) Полный исходник для точности (чтобы библиотека смогла точнее определить различия построчно)
-    enhancers: [
-      markEdits(hunks), // Добавляем вычисление inline-различий
-      markWord("\t", "tab"), // Помечаем табуляцию
-      injectEmptyLinePlaceholders(hunks), // Пустые +/- строки: подставляем placeholder для Comment
-      markLineComments(hunks), // Маркер Comment перед каждой строкой +/- (только insert/delete)
-      markIndentGuides(hunks, { indentSize: 4 }), // Полосы вложенности через pickRanges
-    ],
+    enhancers,
   };
 
   try {

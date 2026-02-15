@@ -5,6 +5,7 @@ export type TokenizeWorkerPayload = {
   hunks: HunkData[];
   oldSource: string | null;
   language?: string;
+  enableComments?: boolean;
 };
 
 self.onmessage = (
@@ -13,7 +14,7 @@ self.onmessage = (
   const { type, payload, id } = e.data;
   if (type !== "tokenize") return;
 
-  const { hunks, language = "text" } = payload;
+  const { hunks, language = "text", enableComments = false } = payload;
 
   if (!hunks?.length) {
     self.postMessage({ payload: { success: true, tokens: null }, id });
@@ -21,7 +22,7 @@ self.onmessage = (
   }
 
   try {
-    const tokens = tokenizeDiff(hunks, language);
+    const tokens = tokenizeDiff(hunks, language, enableComments);
     self.postMessage({ payload: { success: true, tokens }, id });
   } catch (err) {
     self.postMessage({

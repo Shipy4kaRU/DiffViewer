@@ -1,9 +1,10 @@
 import type { RenderToken } from "react-diff-view";
 import styles from "./DiffFile.module.css";
 import { CommentTrigger } from "./CommentTrigger/CommentTrigger";
+import type { ChangeKey } from "./types";
 
 type CreateRenderTokenProps = {
-  handleCreateComment: (key: string) => void;
+  handleCreateComment?: (changeKey: ChangeKey) => void;
 };
 
 export const createRenderToken = ({
@@ -20,7 +21,7 @@ export const createRenderToken = ({
       );
     }
 
-    if (token.type === "line-comment") {
+    if (token.type === "line-comment" && handleCreateComment) {
       const changeType = (token as { changeType?: "insert" | "delete" })
         .changeType;
 

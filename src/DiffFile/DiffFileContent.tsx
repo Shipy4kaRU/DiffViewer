@@ -1,36 +1,19 @@
-import { Fragment, useMemo, type ReactElement } from "react";
-import { getTokenizeWorker } from "./tokenizeDiff";
+import { useMemo, type ReactElement } from "react";
 import { useComments } from "./CommentsContext/useComments";
-import { Decoration, Diff, Hunk, useTokenizeWorker } from "react-diff-view";
-import type { FileData, HunkData, HunkTokens, ViewType } from "react-diff-view";
-import styles from "./DiffFile.module.css";
+import type { FileData, ViewType } from "react-diff-view";
 import type { ChangeKey } from "./types";
 import { CommentWidget } from "./CommentWidget/CommentWidget";
+import { DiffView } from "./DiffView";
 import { createRenderToken } from "./createRenderToken";
 
-const renderHunk = (hunk: HunkData) => (
-  <Fragment key={hunk.content}>
-    <Decoration className={styles.decoration}>{hunk.content}</Decoration>
-    <Hunk key={hunk.content} hunk={hunk} />
-  </Fragment>
-);
-
-const getFileExtension = (filePath: string) => {
-  return filePath.split(".").pop() ?? "";
-};
-
-type DiffFileContentProps = FileData & {
+type DiffFileContentProps = {
+  diffFile: FileData;
   viewType: ViewType;
-  tokens: HunkTokens | null;
 };
 
 export const DiffFileContent = ({
-  oldRevision,
-  newRevision,
-  type,
-  hunks = [],
+  diffFile,
   viewType,
-  newPath,
 }: DiffFileContentProps) => {
   const {
     comments,
@@ -40,18 +23,6 @@ export const DiffFileContent = ({
     handleCloseCommentForm,
     handleDeleteComment,
   } = useComments();
-  const tokenizeWorker = useMemo(() => getTokenizeWorker(), []);
-  const tokenizePayload = useMemo(
-    () => ({
-      hunks: hunks,
-      oldSource: null,
-      language: getFileExtension(newPath),
-    }),
-    [hunks, newPath]
-  );
-  const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
-
-  console.debug("[DiffFileContent] commentsData: ", comments);
 
   const widgets = useMemo(() => {
     return Object.keys(comments).reduce<Record<ChangeKey, ReactElement>>(
@@ -86,18 +57,12 @@ export const DiffFileContent = ({
   );
 
   return (
-    <Diff
-      key={`${oldRevision}-${newRevision}`}
+    <DiffView
+      diffFile={diffFile}
       viewType={viewType}
-      diffType={type}
-      hunks={hunks}
-      tokens={tokens}
-      renderToken={renderToken}
-      optimizeSelection
-      className={styles.diff}
       widgets={widgets}
-    >
-      {(hunks) => hunks.map(renderHunk)}
-    </Diff>
+      renderToken={renderToken}
+      enableComments
+    />
   );
 };
