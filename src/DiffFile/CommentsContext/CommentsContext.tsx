@@ -1,9 +1,35 @@
-import { useCallback, useMemo, useState } from "react";
-import type { CommentContent, CommentId, CommentType } from "./Comment/types";
-import type { ChangeKey } from "./types";
+/* eslint-disable react-refresh/only-export-components */
+import {
+  createContext,
+  useState,
+  type ReactNode,
+  useMemo,
+  useCallback,
+} from "react";
+import type { CommentContent, CommentId, CommentType } from "../Comment/types";
+import type { ChangeKey } from "../types";
 import { nanoid } from "nanoid";
 
-export const useComments = () => {
+type CommentsContextValue = {
+  comments: Record<ChangeKey, CommentType[]>;
+  handleCreateComment: (changeKey: ChangeKey) => void;
+  handleSaveComment: (
+    changeKey: ChangeKey,
+    commentId: CommentId,
+    content: CommentContent
+  ) => void;
+  handleEditComment: (changeKey: ChangeKey, commentId: CommentId) => void;
+  handleCloseCommentForm: (changeKey: ChangeKey, commentId: CommentId) => void;
+  handleDeleteComment: (changeKey: ChangeKey, commentId: CommentId) => void;
+} | null;
+
+export const CommentsContext = createContext<CommentsContextValue>(null);
+
+type CommentsProviderProps = {
+  children: ReactNode;
+};
+
+export const CommentsProvider = ({ children }: CommentsProviderProps) => {
   const [comments, setComments] = useState<Record<ChangeKey, CommentType[]>>(
     {}
   );
@@ -176,5 +202,9 @@ export const useComments = () => {
     ]
   );
 
-  return commentsData;
+  return (
+    <CommentsContext.Provider value={commentsData}>
+      {children}
+    </CommentsContext.Provider>
+  );
 };

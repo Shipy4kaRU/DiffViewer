@@ -1,6 +1,6 @@
 import { Fragment, useMemo, type ReactElement } from "react";
 import { getTokenizeWorker } from "./tokenizeDiff";
-import { useComments } from "./useComments";
+import { useComments } from "./CommentsContext/useComments";
 import { Decoration, Diff, Hunk, useTokenizeWorker } from "react-diff-view";
 import type { FileData, HunkData, HunkTokens, ViewType } from "react-diff-view";
 import styles from "./DiffFile.module.css";

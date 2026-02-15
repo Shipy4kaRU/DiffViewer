@@ -38,9 +38,9 @@ export const tokenizeDiff = (hunks: HunkData[], lang: string) => {
     enhancers: [
       markEdits(hunks), // Добавляем вычисление inline-различий
       markWord("\t", "tab"), // Помечаем табуляцию
-      markIndentGuides(hunks, { indentSize: 4 }), // Полосы вложенности через pickRanges
       injectEmptyLinePlaceholders(hunks), // Пустые +/- строки: подставляем placeholder для Comment
       markLineComments(hunks), // Маркер Comment перед каждой строкой +/- (только insert/delete)
+      markIndentGuides(hunks, { indentSize: 4 }), // Полосы вложенности через pickRanges
     ],
   };
 

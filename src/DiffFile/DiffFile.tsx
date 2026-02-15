@@ -9,6 +9,7 @@ import "react-diff-view/style/index.css";
 import "prism-color-variables/variables.css";
 import { DiffFileHeader } from "./DiffFileHeader";
 import { DiffFileContent } from "./DiffFileContent";
+import { CommentsProvider } from "./CommentsContext/CommentsContext";
 
 const countDiffLines = (hunks: HunkData[]) => {
   let deleted = 0;
@@ -42,19 +43,21 @@ export const DiffFile = ({ diff }: DiffFileProps) => {
   console.log("[DiffFile] count: ", count);
 
   return (
-    <div className={styles.diffFile}>
-      <DiffFileHeader
-        lines={count}
-        filename={file.newPath}
-        isSplit={isSplit}
-        setSplit={() => setIsSplit(true)}
-        setUnified={() => setIsSplit(false)}
-      />
-      <DiffFileContent
-        {...file}
-        viewType={isSplit ? "split" : "unified"}
-        tokens={null}
-      />
-    </div>
+    <CommentsProvider>
+      <div className={styles.diffFile}>
+        <DiffFileHeader
+          lines={count}
+          filename={file.newPath}
+          isSplit={isSplit}
+          setSplit={() => setIsSplit(true)}
+          setUnified={() => setIsSplit(false)}
+        />
+        <DiffFileContent
+          {...file}
+          viewType={isSplit ? "split" : "unified"}
+          tokens={null}
+        />
+      </div>
+    </CommentsProvider>
   );
 };

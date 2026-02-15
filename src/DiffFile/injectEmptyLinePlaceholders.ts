@@ -37,11 +37,11 @@ export const injectEmptyLinePlaceholders = (
   const { oldLineNumbers, newLineNumbers } = getEmptyLineNumbers(hunks);
 
   return ([oldLinesOfPaths, newLinesOfPaths]) => [
-    oldLinesOfPaths.map((paths, i) =>
-      oldLineNumbers.has(i + 1) ? [EMPTY_LINE_PLACEHOLDER_PATH] : paths
+    oldLinesOfPaths.map((path, i) =>
+      oldLineNumbers.has(i + 1) ? [EMPTY_LINE_PLACEHOLDER_PATH] : path
     ),
-    newLinesOfPaths.map((paths, i) =>
-      newLineNumbers.has(i + 1) ? [EMPTY_LINE_PLACEHOLDER_PATH] : paths
+    newLinesOfPaths.map((path, i) =>
+      newLineNumbers.has(i + 1) ? [EMPTY_LINE_PLACEHOLDER_PATH] : path
     ),
   ];
 };
