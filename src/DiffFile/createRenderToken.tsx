@@ -1,14 +1,13 @@
 import type { RenderToken } from "react-diff-view";
 import styles from "./DiffFile.module.css";
-import { NewComment } from "./Comment/Comment";
-import { getChangeKey } from "react-diff-view";
+import { CommentTrigger } from "./CommentTrigger/CommentTrigger";
 
 type CreateRenderTokenProps = {
-  handleNewComment: (key: string) => void;
+  handleCreateComment: (key: string) => void;
 };
 
 export const createRenderToken = ({
-  handleNewComment,
+  handleCreateComment,
 }: CreateRenderTokenProps) => {
   const renderToken: RenderToken = (token, defaultRender, i) => {
     if (token.type === "indent-guide") {
@@ -28,10 +27,10 @@ export const createRenderToken = ({
       return (
         <span key={i} className={styles.lineCommentWrap}>
           {changeType != null && (
-            <NewComment
+            <CommentTrigger
               type={changeType}
-              id={getChangeKey(token.properties.change)}
-              onClick={handleNewComment}
+              onTrigger={handleCreateComment}
+              change={token.properties.change}
             />
           )}
           {token.children?.map((child, j) =>

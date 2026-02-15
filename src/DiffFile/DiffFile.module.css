@@ -1,3 +1,10 @@
+.diffFile {
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  background-color: #f5f5f5;
+}
+
 .diff {
   --diff-code-insert-background-color: rgb(224, 255, 233);
   --diff-gutter-insert-background-color: rgb(158, 250, 175);
