@@ -95,20 +95,48 @@ const DiffFileContent = ({
     }));
   }, []);
 
-  const handleAddComment = useCallback((key: string, content: string) => {
-    setCommentsData((prev) => ({
-      ...prev,
-      [key]: [
-        ...(prev[key] || []),
-        { changeKey: key, content, time: new Date() },
-      ],
-    }));
-  }, []);
+  const handleAddComment = useCallback(
+    (id: string, changeKey: string, content: string) => {
+      setCommentsData((prev) => ({
+        ...prev,
+        [changeKey]: [
+          ...(prev[changeKey] || []),
+          { id, changeKey, content, time: new Date() },
+        ],
+      }));
+    },
+    []
+  );
 
   const handleCloseForm = useCallback((key: string) => {
     setActiveAddForms((prev) => ({
       ...prev,
       [key]: false,
+    }));
+  }, []);
+
+  const handleEditComment = useCallback(
+    (id: string, changeKey: string, content: string) => {
+      console.log(
+        "[DiffFileContent] handleEditComment: ",
+        id,
+        changeKey,
+        content
+      );
+      setCommentsData((prev) => ({
+        ...prev,
+        [changeKey]: prev[changeKey].map((comment) =>
+          comment.id === id ? { ...comment, content } : comment
+        ),
+      }));
+    },
+    []
+  );
+
+  const handleDeleteComment = useCallback((id: string, changeKey: string) => {
+    setCommentsData((prev) => ({
+      ...prev,
+      [changeKey]: prev[changeKey].filter((comment) => comment.id !== id),
     }));
   }, []);
 
@@ -127,6 +155,8 @@ const DiffFileContent = ({
           onClose={handleCloseForm}
           onSave={handleAddComment}
           onNewComment={handleNewComment}
+          onEdit={handleEditComment}
+          onDelete={handleDeleteComment}
         />
       );
       return acc;

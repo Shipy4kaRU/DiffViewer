@@ -4,8 +4,10 @@ type LineWidgetProps = {
   comments: CommentProps[];
   showAddForm: boolean;
   onClose: (changeKey: string) => void;
-  onSave: (changeKey: string, content: string) => void;
+  onSave: (id: string, changeKey: string, content: string) => void;
   onNewComment: (changeKey: string) => void;
+  onEdit: (id: string, changeKey: string, content: string) => void;
+  onDelete: (id: string, changeKey: string) => void;
   changeKey: string;
 };
 
@@ -14,17 +16,24 @@ export const LineWidget = ({
   showAddForm,
   onClose,
   onSave,
+  onEdit,
+  onDelete,
   onNewComment,
   changeKey,
 }: LineWidgetProps) => (
   <div className="diff-widget-container">
     {comments.map((comment) => (
-      <Comment {...comment} onNewComment={onNewComment} />
+      <Comment
+        {...comment}
+        onNewComment={onNewComment}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
     ))}
 
     {showAddForm && (
       <AddCommentForm
-        onSave={(text) => onSave(changeKey, text)}
+        onSave={(id, text) => onSave(id, changeKey, text)}
         onCancel={() => onClose(changeKey)}
       />
     )}
