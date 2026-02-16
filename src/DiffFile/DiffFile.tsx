@@ -10,6 +10,7 @@ import "prism-color-variables/variables.css";
 import { DiffFileHeader } from "./DiffFileHeader";
 import { DiffFileContent } from "./DiffFileContent";
 import { CommentsProvider } from "./CommentsContext/CommentsContext";
+import { mockDiffComments } from "../CommentChecking/mockDiffComments";
 
 const countDiffLines = (hunks: HunkData[]) => {
   let deleted = 0;
@@ -43,7 +44,7 @@ export const DiffFile = ({ diff }: DiffFileProps) => {
   console.log("[DiffFile] count: ", count);
 
   return (
-    <CommentsProvider>
+    <CommentsProvider hunks={file.hunks} commentsDTO={mockDiffComments}>
       <div className={styles.diffFile}>
         <DiffFileHeader
           lines={count}

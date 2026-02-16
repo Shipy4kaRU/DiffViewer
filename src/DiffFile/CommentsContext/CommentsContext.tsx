@@ -9,6 +9,13 @@ import {
 import type { CommentContent, CommentId, CommentType } from "../Comment/types";
 import type { ChangeKey } from "../types";
 import { nanoid } from "nanoid";
+import type { DiffComment } from "../../CommentChecking/types";
+import {
+  findChangeByNewLineNumber,
+  findChangeByOldLineNumber,
+  getChangeKey,
+  type HunkData,
+} from "react-diff-view";
 
 type CommentsContextValue = {
   comments: Record<ChangeKey, CommentType[]>;
@@ -26,12 +33,82 @@ type CommentsContextValue = {
 export const CommentsContext = createContext<CommentsContextValue>(null);
 
 type CommentsProviderProps = {
+  hunks: HunkData[];
+  commentsDTO: DiffComment[];
   children: ReactNode;
 };
 
-export const CommentsProvider = ({ children }: CommentsProviderProps) => {
+type Change =
+  | {
+      type: "insert";
+      content: string;
+      lineNumber: number;
+      isInsert: true;
+    }
+  | {
+      type: "delete";
+      content: string;
+      lineNumber: number;
+      isDelete: true;
+    }
+  | {
+      type: "normal";
+      content: string;
+      isNormal: true;
+      oldLineNumber: number;
+      newLineNumber: number;
+    }
+  | undefined;
+
+const parseDTOToComments = (
+  hunks: HunkData[],
+  comments: DiffComment[]
+): Record<ChangeKey, CommentType[]> => {
+  return comments.reduce((acc, { commit_id, line, side, content, author }) => {
+    let changeKey: ChangeKey | null = null;
+    let change: Change | undefined;
+
+    if (side === "proposed") {
+      change = findChangeByNewLineNumber(hunks, +line);
+      changeKey = change ? getChangeKey(change) : null;
+    } else if (side === "base") {
+      change = findChangeByOldLineNumber(hunks, +line);
+      changeKey = change ? getChangeKey(change) : null;
+    }
+
+    console.log(JSON.stringify(author), change, changeKey, line, side);
+
+    if (author.name === "Sergey Volkov") {
+      changeKey = "I21";
+    }
+
+    if (!changeKey) {
+      return acc;
+    }
+
+    if (!acc[changeKey]) {
+      acc[changeKey] = [];
+    }
+
+    acc[changeKey].push({
+      commentId: commit_id,
+      changeKey,
+      content,
+      time: new Date(),
+      state: "display",
+    });
+
+    return acc;
+  }, {} as Record<ChangeKey, CommentType[]>);
+};
+
+export const CommentsProvider = ({
+  hunks,
+  commentsDTO,
+  children,
+}: CommentsProviderProps) => {
   const [comments, setComments] = useState<Record<ChangeKey, CommentType[]>>(
-    {}
+    () => parseDTOToComments(hunks, commentsDTO)
   );
 
   const handleCreateComment = useCallback((changeKey: ChangeKey) => {
