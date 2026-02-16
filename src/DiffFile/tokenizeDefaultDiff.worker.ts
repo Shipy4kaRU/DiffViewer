@@ -1,10 +1,17 @@
+import { type HunkData } from "react-diff-view";
 import { tokenizeDiff } from "./tokenizeDiff";
-import type { TokenizeDefaultWorkerPayload } from "./tokenizeDefaultDiff.worker";
 
-export type TokenizeWorkerPayload = TokenizeDefaultWorkerPayload;
+export type TokenizeDefaultWorkerPayload = {
+  hunks: HunkData[];
+  language?: string;
+};
 
 self.onmessage = (
-  e: MessageEvent<{ type: string; payload: TokenizeWorkerPayload; id: number }>
+  e: MessageEvent<{
+    type: string;
+    payload: TokenizeDefaultWorkerPayload;
+    id: number;
+  }>
 ) => {
   const { type, payload, id } = e.data;
   if (type !== "tokenize") return;

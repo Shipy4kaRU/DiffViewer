@@ -5,6 +5,7 @@ import type { ChangeKey } from "./types";
 import { CommentWidget } from "./CommentWidget/CommentWidget";
 import { DiffView } from "./DiffView";
 import { createRenderToken } from "./createRenderToken";
+import { getTokenizeWorker } from "./tokenizeDiff";
 
 type DiffFileContentProps = {
   diffFile: FileData;
@@ -51,6 +52,8 @@ export const DiffFileContent = ({
     handleDeleteComment,
   ]);
 
+  const commentsWorker = useMemo(() => getTokenizeWorker(), []);
+
   const renderToken = useMemo(
     () => createRenderToken({ handleCreateComment }),
     [handleCreateComment]
@@ -63,6 +66,7 @@ export const DiffFileContent = ({
       widgets={widgets}
       renderToken={renderToken}
       enableComments
+      tokenizeWorker={commentsWorker}
     />
   );
 };

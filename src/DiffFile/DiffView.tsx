@@ -10,7 +10,7 @@ import {
 } from "react-diff-view";
 import { Diff } from "react-diff-view";
 import type { RenderToken } from "react-diff-view";
-import { getTokenizeWorker } from "./tokenizeDiff";
+import { getDefaultTokenizeWorker } from "./tokenizeDefaultDiff";
 import styles from "./DiffFile.module.css";
 import type { ReactNode } from "react";
 
@@ -50,6 +50,7 @@ type DiffViewBaseProps = {
   enableComments?: boolean;
   widgets?: Record<string, ReactNode>;
   renderToken?: RenderToken;
+  tokenizeWorker?: Worker;
 };
 
 export const DiffView = ({
@@ -59,6 +60,7 @@ export const DiffView = ({
   enableComments = false,
   widgets,
   renderToken,
+  tokenizeWorker: tokenizeWorkerProp,
 }: DiffViewProps) => {
   const file = useMemo(() => {
     if (diffFile) {
@@ -67,7 +69,10 @@ export const DiffView = ({
 
     return parseDiff(diff, { nearbySequences: "zip" })[0];
   }, [diffFile, diff]);
-  const tokenizeWorker = useMemo(() => getTokenizeWorker(), []);
+  const tokenizeWorker = useMemo(
+    () => tokenizeWorkerProp ?? getDefaultTokenizeWorker(),
+    [tokenizeWorkerProp]
+  );
   const tokenizePayload = useMemo(
     () => ({
       hunks: file.hunks ?? "",

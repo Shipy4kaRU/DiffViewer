@@ -1,15 +1,13 @@
 import { type HunkData, markEdits, tokenize, markWord } from "react-diff-view";
 import refractor from "refractor";
 import { markIndentGuides } from "./markIndentGuides";
-import { injectEmptyLinePlaceholders } from "./injectEmptyLinePlaceholders";
-import { markLineComments } from "./markLineComments";
 
 let workerInstance: Worker | null = null;
 
-export const getTokenizeWorker = (): Worker => {
+export const getDefaultTokenizeWorker = (): Worker => {
   if (!workerInstance) {
     workerInstance = new Worker(
-      new URL("./tokenizeDiff.worker.ts", import.meta.url),
+      new URL("./tokenizeDefaultDiff.worker.ts", import.meta.url),
       { type: "module" }
     );
   }
@@ -32,8 +30,6 @@ export const tokenizeDiff = (hunks: HunkData[], lang: string) => {
     enhancers: [
       markEdits(hunks), // Вычисление inline-различий
       markWord("\t", "tab"), // Помечаем табуляцию
-      injectEmptyLinePlaceholders(hunks),
-      markLineComments(hunks), // Пустые +/- строки: подставляем placeholder для Comment и маркер +/-
       markIndentGuides(hunks, { indentSize: 4 }), // Полосы вложенности
     ],
   };
