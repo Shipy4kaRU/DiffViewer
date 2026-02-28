@@ -10,9 +10,9 @@ import { pythonDiff } from "./textDiffs/pythonDiff";
 export default function App() {
   return (
     <>
-      <DiffFile diff={yamldiff} />
-      <DiffView diff={pythonDiff} />
-      <DiffView diff={reactDiff} />
+      <DiffFile diff={reactDiff} />
+      {/* <DiffView diff={pythonDiff} />
+      <DiffView diff={reactDiff} /> */}
     </>
   );
 }

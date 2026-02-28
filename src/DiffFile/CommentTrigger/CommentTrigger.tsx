@@ -3,9 +3,10 @@ import { getChangeKey } from "react-diff-view";
 import styles from "./CommentTrigger.module.css";
 import type { ChangeKey } from "../types";
 import { useComments } from "../CommentsContext/useComments";
+import type { ChangeType } from "../markLineComments";
 
 type CommentTriggerProps = {
-  type: "delete" | "insert";
+  type: ChangeType;
   change: ChangeData;
   onTrigger: (changeKey: ChangeKey) => void;
 };
