@@ -1,3 +1,6 @@
+diff --git a/diff.txt b/diff.txt
+new file mode 100644
+index 0000000..e69de29
 diff --git a/src/App.tsx b/src/App.tsx
 index 534f5ae..85ebabf 100644
 --- a/src/App.tsx
@@ -15,6 +18,311 @@ index 534f5ae..85ebabf 100644
      </>
    );
  }
+diff --git a/src/CommentTrigger.tsx b/src/CommentTrigger.tsx
+new file mode 100644
+index 0000000..34c3c50
+--- /dev/null
++++ b/src/CommentTrigger.tsx
+@@ -0,0 +1,40 @@
++import { useCallback } from "react";
++import styled from "@emotion/styled";
++import { type ChangeData, getChangeKey } from "react-diff-view";
++
++const Trigger = styled.span`
++  display: flex;
++  justify-content: space-around;
++  align-items: center;
++  position: absolute;
++  z-index: 1;
++  top: 6px;
++  right: 6px;
++  width: 22px;
++  height: 22px;
++  font-size: 16px;
++  font-weight: bold;
++  background-color: var(--background-color-pure);
++  box-shadow: 0 1px 4px rgba(27, 31, 35, 0.15);
++  color: var(--diff-decoration-content-color);
++
++  :hover {
++    transition: all 0.2s linear;
++    background-color: var(--background-color-secondary);
++    color: #333;
++  }
++`;
++
++interface Props {
++  change: ChangeData;
++  onClick: (value: string) => void;
++}
++
++export default function CommentTrigger({ change, onClick }: Props) {
++  const click = useCallback(
++    () => onClick(getChangeKey(change)),
++    [change, onClick]
++  );
++
++  return <Trigger onClick={click}>+</Trigger>;
++}
+diff --git a/src/DiffFile.tsx b/src/DiffFile.tsx
+new file mode 100644
+index 0000000..bf17dde
+--- /dev/null
++++ b/src/DiffFile.tsx
+@@ -0,0 +1,253 @@
++import { type ReactElement, useCallback, useMemo, useState } from "react";
++import { nanoid } from "nanoid";
++import {
++  Diff,
++  Hunk,
++  useSourceExpansion,
++  useMinCollapsedLines,
++  // useTokenizeWorker,
++  type HunkData,
++  type MarkEditsType,
++  type DiffType,
++  type GutterOptions,
++  type EventMap,
++} from "react-diff-view";
++// import "react-diff-view/styles/index.css";
++import { useConfiguration } from "./configuration";
++import HunkInfo from "./HunkInfo";
++import UnfoldCollapsed from "./UnfoldCollapsed";
++import CommentTrigger from "./CommentTrigger";
++import Comment from "./Comment";
++// import TokenizeWorker from "./Tokenize?worker";
++// import "./diff.global.less";
++// import "./syntax.global.less";
++import { useSelection } from "./useSelection";
++
++// const tokenize = new TokenizeWorker();
++
++interface EnhanceOptions {
++  language: string;
++  editsType: MarkEditsType;
++}
++
++function useEnhance(
++  hunks: HunkData[],
++  oldSource: string | null,
++  { language, editsType }: EnhanceOptions
++) {
++  const [hunksWithSourceExpanded, expandRange] = useSourceExpansion(
++    hunks,
++    oldSource
++  );
++  const hunksWithMinLinesCollapsed = useMinCollapsedLines(
++    0,
++    hunksWithSourceExpanded,
++    oldSource
++  );
++  const [selection, toggleSelection] = useSelection(hunksWithMinLinesCollapsed);
++  // const tokenizePayload = {
++  //   oldSource,
++  //   language,
++  //   editsType,
++  //   hunks: hunksWithMinLinesCollapsed,
++  // };
++  // const { tokens } = useTokenizeWorker(tokenize, tokenizePayload);
++  return {
++    expandRange,
++    selection,
++    toggleSelection,
++    // tokens,
++    hunks: hunksWithMinLinesCollapsed,
++  };
++}
++
++interface CommentData {
++  id: string;
++  changeKey: string;
++  state: "create" | "edit" | "display";
++  content: string;
++  time: Date;
++}
++
++function useComments() {
++  const [comments, setComments] = useState<CommentData[]>([]);
++  const addComment = useCallback((changeKey: string) => {
++    const addNew = (state: CommentData[]): CommentData[] => [
++      ...state,
++      {
++        changeKey,
++        id: nanoid(),
++        state: "create",
++        content: "",
++        time: new Date(),
++      },
++    ];
++    setComments(addNew);
++  }, []);
++  const editComment = useCallback((commentId: string) => {
++    const mayUpdate = (comment: CommentData): CommentData => {
++      if (comment.id !== commentId) {
++        return comment;
++      }
++
++      return { ...comment, state: "edit" };
++    };
++    setComments((s) => s.map(mayUpdate));
++  }, []);
++  const saveEdit = useCallback((commentId: string, content: string) => {
++    const mayUpdate = (comment: CommentData): CommentData => {
++      if (comment.id !== commentId) {
++        return comment;
++      }
++
++      return { ...comment, content, state: "display", time: new Date() };
++    };
++    setComments((s) => s.map(mayUpdate));
++  }, []);
++  const cancelEdit = useCallback((commentId: string) => {
++    const mayUpdate = (comment: CommentData): CommentData => {
++      if (comment.id !== commentId) {
++        return comment;
++      }
++
++      return { ...comment, state: "display" };
++    };
++    setComments((s) => s.map(mayUpdate));
++  }, []);
++  const deleteComment = useCallback(
++    (commentId: string) =>
++      setComments((s) => s.filter((v) => v.id !== commentId)),
++    []
++  );
++
++  return [
++    comments,
++    { addComment, editComment, saveEdit, cancelEdit, deleteComment },
++  ] as const;
++}
++
++interface Props {
++  oldSource: string | null;
++  type: DiffType;
++  hunks: HunkData[];
++}
++
++export const DiffView = (props: Props) => {
++  console.log("[DiffView] props", props);
++
++  const { oldSource, type } = props;
++  const configuration = useConfiguration();
++  const { expandRange, selection, toggleSelection, hunks } = useEnhance(
++    props.hunks,
++    oldSource,
++    configuration
++  );
++  const [
++    comments,
++    { addComment, editComment, saveEdit, cancelEdit, deleteComment },
++  ] = useComments();
++  const widgets = useMemo(
++    () =>
++      comments.reduce<Record<string, ReactElement[]>>((widgets, comment) => {
++        if (!widgets[comment.changeKey]) {
++          widgets[comment.changeKey] = [];
++        }
++        widgets[comment.changeKey].push(
++          <Comment
++            key={comment.id}
++            id={comment.id}
++            content={comment.content}
++            state={comment.state}
++            time={comment.time}
++            onSave={saveEdit}
++            onEdit={editComment}
++            onCancel={cancelEdit}
++            onDelete={deleteComment}
++          />
++        );
++        return widgets;
++      }, {}),
++    [comments, saveEdit, editComment, cancelEdit, deleteComment]
++  );
++  const { viewType, showGutter } = configuration;
++  const renderGutter = useCallback(
++    ({
++      change,
++      side,
++      inHoverState,
++      renderDefault,
++      wrapInAnchor,
++    }: GutterOptions) => {
++      const canComment =
++        inHoverState && (viewType === "split" || side === "new");
++      if (canComment) {
++        return <CommentTrigger change={change} onClick={addComment} />;
++      }
++
++      return wrapInAnchor(renderDefault());
++    },
++    [addComment, viewType]
++  );
++  const events: EventMap = {
++    onClick: toggleSelection,
++  };
++  const linesCount = oldSource ? oldSource.split("\n").length : 0;
++
++  const renderHunk = (
++    children: ReactElement[],
++    hunk: HunkData,
++    i: number,
++    hunks: HunkData[]
++  ) => {
++    const previousElement = children[children.length - 1];
++    const decorationElement = oldSource ? (
++      <UnfoldCollapsed
++        key={`decoration-${hunk.content}`}
++        previousHunk={
++          previousElement && (previousElement.props?.hunk as HunkData)
++        }
++        currentHunk={hunk}
++        linesCount={linesCount}
++        onExpand={expandRange}
++      />
++    ) : (
++      <HunkInfo key={`decoration-${hunk.content}`} hunk={hunk} />
++    );
++    children.push(decorationElement);
++
++    const hunkElement = <Hunk key={`hunk-${hunk.content}`} hunk={hunk} />;
++    children.push(hunkElement);
++
++    if (i === hunks.length - 1 && oldSource) {
++      const unfoldTailElement = (
++        <UnfoldCollapsed
++          key="decoration-tail"
++          previousHunk={hunk}
++          linesCount={linesCount}
++          onExpand={expandRange}
++        />
++      );
++      children.push(unfoldTailElement);
++    }
++
++    return children;
++  };
++
++  return (
++    <Diff
++      optimizeSelection
++      viewType={viewType}
++      diffType={type}
++      hunks={hunks}
++      gutterType={showGutter ? "default" : "none"}
++      selectedChanges={selection}
++      tokens={[]}
++      widgets={widgets}
++      codeEvents={events}
++      gutterEvents={events}
++      renderGutter={renderGutter}
++    >
++      {(hunks) => hunks.reduce(renderHunk, [])}
++    </Diff>
++  );
++};
 diff --git a/src/DiffFile/CommentTrigger/CommentTrigger.tsx b/src/DiffFile/CommentTrigger/CommentTrigger.tsx
 index 839713f..003e8ec 100644
 --- a/src/DiffFile/CommentTrigger/CommentTrigger.tsx
@@ -71,27 +379,32 @@ index a75af74..537950f 100644
  
  /* gutter */
 diff --git a/src/DiffFile/DiffView.tsx b/src/DiffFile/DiffView.tsx
-index fa97fa8..bb89650 100644
+index fa97fa8..fd3d40c 100644
 --- a/src/DiffFile/DiffView.tsx
 +++ b/src/DiffFile/DiffView.tsx
 @@ -1,4 +1,4 @@
 -import { Fragment, useMemo } from "react";
-+import { Fragment, useMemo, useState } from "react";
++import {  useMemo, useState } from "react";
  import {
    useTokenizeWorker,
    type FileData,
-@@ -7,6 +7,10 @@ import {
+@@ -7,25 +7,144 @@ import {
    Decoration,
    Hunk,
    parseDiff,
 +  getCollapsedLinesCountBetween,
-+  expandFromRawCode,
 +  textLinesToHunk,
 +  insertHunk,
  } from "react-diff-view";
  import { Diff } from "react-diff-view";
  import type { RenderToken } from "react-diff-view";
-@@ -18,14 +22,101 @@ const getFileExtension = (filePath: string) => {
+ import { getDefaultTokenizeWorker } from "./tokenizeDefaultDiff";
+ import styles from "./DiffFile.module.css";
+ import type { ReactNode } from "react";
++import { getLines, lines } from "../baseFile";
++import type { ExtendedChange } from "./types";
+ 
+ const getFileExtension = (filePath: string) => {
    return filePath.split(".").pop() ?? "";
  };
  
@@ -118,50 +431,59 @@ index fa97fa8..bb89650 100644
 +};
 +
 +const ExpandedDecoratedHunk = ({hunk, expand, onClick}: {hunk?: HunkData, expand: ExpandType, onClick?: (type?: "up" | "down") => void} ) => {
-+  return (<Fragment>
++  return (<>
 +  <Decoration className={styles.decoration} gutterClassName={styles.decorationGutter} contentClassName={styles.decorationContent}>
 +    <ExpandButton expand={expand} onClick={(type) => onClick?.(type)} />
 +    {hunk && hunk.content}
 +  </Decoration>
-+  {hunk && <Hunk key={hunk.content} hunk={hunk} />}
-+</Fragment>)
++  {hunk && <Hunk hunk={hunk} />}
++</>)
 +}
 +
-+const TOTAL_NUMBER = 1000; // TODO: какое-то число от бэка нужно
++const TOTAL_NUMBER = lines.length - 1; // TODO: какое-то число от бэка нужно
 +
-+const renderDiffChildren = (hunks: HunkData[], setHunks: (hunk: HunkData) => void) => {
-+  const expand = (start: number, end: number) => {
-+    console.log("DIFF EXPAND REQUEST: ", start, end);
-+    // const mockResponse = {
-+    //   // Начинаем строго со следующей строки после 1-го ханга
-+    //   start: 5, 
-+    //   // Заканчиваем строго перед началом 2-го ханга
-+    //   end: 6,   
-+    //   // Количество строк должно быть ровно 2 (6 - 5 + 1)
-+    //   lines: [
-+    //     "  useTokenizeWorker,", // это реальная 5-я строка из твоего файла
-+    //     "  type FileData,"      // это реальная 6-я строка
-+    //   ]
-+    // };
++console.log("TOTAL_NUMBER: ", TOTAL_NUMBER, lines);
++
++const renderDiffChildren = (hunks: HunkData[], setHunks: (hunk: HunkData[]) => void) => {
++  const expand = async (startOld: number, endOld: number, startNew: number) => {
++    console.log("DIFF EXPAND REQUEST: ", startOld, endOld);
++
++    // Тип запрос
++    const getReponse = async () => {
++      await new Promise(resolve => setTimeout(resolve, 100));
++
++      return getLines(startOld, endOld);
++    }
++
++    const lines = await getReponse();
++
++    console.log(lines);
 +  
-+    // const newHunk = textLinesToHunk(mockResponse.lines, mockResponse.start, mockResponse.start);
++    const newHunk = textLinesToHunk(lines, startOld, startNew);
 +
-+    // if (newHunk) {
-+    //   const nextHunks = insertHunk(hunks, newHunk)
-+    //   setHunks(nextHunks);
-+    // };
++    if (newHunk) {
++      newHunk.changes.forEach(change => {
++        (change as ExtendedChange).isExpanded = true;
++      })
++
++      const nextHunks = insertHunk(hunks, newHunk)
++      setHunks(nextHunks);
++    };
 +  };
 +
 +  const elements = hunks.reduce<React.ReactElement[]>((acc, hunk, ind) => {
 +    if (ind === 0) {
 +      if (hunk.oldStart > 1) {
++        const startOld = Math.max(1, hunk.oldStart - 20);
++        const endOld = hunk.oldStart - 1;
++
 +        acc.push(
-+          <ExpandedDecoratedHunk hunk={hunk} expand="up" onClick={() => expand(hunk.oldStart, hunk.oldStart - 20 >= 1 ? hunk.oldStart - 20 : 1)}/>
++          <ExpandedDecoratedHunk key={hunk.content} hunk={hunk} expand="up" onClick={() => expand(startOld, endOld, startOld)}/>
 +        );
 +      }
 +      else {
 +        acc.push(
-+          <ExpandedDecoratedHunk hunk={hunk} expand="none" />
++          <ExpandedDecoratedHunk key={hunk.content} hunk={hunk} expand="none" />
 +        );
 +      }
 +    }
@@ -172,23 +494,41 @@ index fa97fa8..bb89650 100644
 +      const collapsedCount = getCollapsedLinesCountBetween(prevHunk, hunk);
 +
 +      if (collapsedCount > 0 && collapsedCount <= 20) {
++        const startOld = prevHunk.oldStart + prevHunk.oldLines;
++        const endOld = hunk.oldStart - 1;
++        const startNew = prevHunk.newStart + prevHunk.newLines;
++
 +        acc.push(
-+          <ExpandedDecoratedHunk hunk={hunk} expand="all" onClick={() => expand(prevHunk.oldStart + prevHunk.oldLines, hunk.oldStart - 1)} />
++          <ExpandedDecoratedHunk key={hunk.content} hunk={hunk} expand="all" onClick={() => expand(startOld, endOld, startNew)} />
 +        );
 +      };
 +
 +      if (collapsedCount > 20) {
 +        acc.push(
-+          <ExpandedDecoratedHunk hunk={hunk} expand="up&down" onClick={(type) => {
-+            if (type === "up") expand(hunk.oldStart - 20, hunk.oldStart - 1)
-+            if (type === "down") expand(prevHunk.oldStart + prevHunk.oldLines, prevHunk.oldStart + prevHunk.oldLines + 19);
++          <ExpandedDecoratedHunk key={hunk.content} hunk={hunk} expand="up&down" onClick={(type) => {
++            if (type === "up") {
++              const startOld = hunk.oldStart - 20;
++              const endOld = hunk.oldStart - 1;
++              const startNew = hunk.newStart - (hunk.oldStart - startOld);
++              
++              expand(startOld, endOld, startNew)};
++            if (type === "down") {
++              const startOld = prevHunk.oldStart + prevHunk.oldLines;
++              const endOld = startOld + 19;
++              const startNew = prevHunk.newStart + prevHunk.newLines;
++              
++              expand(startOld, endOld, startNew)};
 +          }} />
 +        );
 +      };
 +    };
 +
 +    if (hunks.length - 1 === ind && hunk.oldStart + hunk.oldLines < TOTAL_NUMBER) {
-+      acc.push(<ExpandedDecoratedHunk expand="down" onClick={() => expand(hunk.oldStart + hunk.oldLines, hunk.oldStart + hunk.oldLines <= TOTAL_NUMBER ?  hunk.oldStart + hunk.oldLines + 19 : TOTAL_NUMBER)}/>)
++      const startOld = hunk.oldStart + hunk.oldLines;
++      const endOld = Math.min(startOld + 19, TOTAL_NUMBER);
++      const startNew = hunk.newStart + hunk.newLines;
++
++      acc.push(<ExpandedDecoratedHunk key={`${hunk.content}-down`} expand="down" onClick={() => expand(startOld, endOld, startNew)}/>)
 +    }
 +
 +    return acc;
@@ -200,7 +540,7 @@ index fa97fa8..bb89650 100644
  
  const defaultRenderToken: RenderToken = (token, defaultRender, i) => {
    if (token.type === "indent-guide") {
-@@ -73,36 +164,36 @@ export const DiffView = ({
+@@ -73,36 +192,36 @@ export const DiffView = ({
      () => tokenizeWorkerProp ?? getDefaultTokenizeWorker(),
      [tokenizeWorkerProp]
    );
@@ -247,7 +587,7 @@ index fa97fa8..bb89650 100644
    );
  };
 diff --git a/src/DiffFile/createRenderToken.tsx b/src/DiffFile/createRenderToken.tsx
-index 5dda7e4..56e8e55 100644
+index 5dda7e4..7b6f3f6 100644
 --- a/src/DiffFile/createRenderToken.tsx
 +++ b/src/DiffFile/createRenderToken.tsx
 @@ -2,6 +2,7 @@ import type { RenderToken } from "react-diff-view";
@@ -258,7 +598,7 @@ index 5dda7e4..56e8e55 100644
  
  type CreateRenderTokenProps = {
    handleCreateComment?: (changeKey: ChangeKey) => void;
-@@ -22,7 +23,7 @@ export const createRenderToken = ({
+@@ -22,18 +23,18 @@ export const createRenderToken = ({
      }
  
      if (token.type === "line-comment" && handleCreateComment) {
@@ -267,24 +607,61 @@ index 5dda7e4..56e8e55 100644
          .changeType;
  
        return (
+         <span key={i} className={styles.lineCommentWrap}>
+-          {changeType != null && (
++          {changeType && changeType !== "explanded" ?  (
+             <CommentTrigger
+               type={changeType}
+               onTrigger={handleCreateComment}
+               change={token.properties.change}
+             />
+-          )}
++          ) : <div style={{width: "20px", height: "20px"}}/>}
+           {token.children?.map((child, j) =>
+             renderToken(child, defaultRender, j)
+           )}
 diff --git a/src/DiffFile/markLineComments.ts b/src/DiffFile/markLineComments.ts
-index 91bf226..a33cf62 100644
+index 91bf226..b1fbd40 100644
 --- a/src/DiffFile/markLineComments.ts
 +++ b/src/DiffFile/markLineComments.ts
-@@ -14,7 +14,7 @@ import type {
+@@ -11,10 +11,11 @@ import type {
+   RangeTokenNode,
+   TokenizeEnhancer,
+ } from "react-diff-view";
++import type { ExtendedChange } from "./types";
  
  const LINE_COMMENT_TYPE = "line-comment";
  
 -type ChangeType = "insert" | "delete";
-+export type ChangeType = "insert" | "delete" | "no-changes";
++export type ChangeType = "insert" | "delete" | "no-changes" | "explanded";
  
  type LineCommentRange = RangeTokenNode & {
    changeType: ChangeType;
-@@ -45,6 +45,15 @@ export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
+@@ -27,7 +28,9 @@ export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
+ 
+   for (const hunk of hunks) {
+     for (const change of hunk.changes) {
+-      if (isDelete(change)) {
++      const isExpanded = (change as ExtendedChange).isExpanded;
++
++      if (isDelete(change) && !isExpanded) {
+         oldRanges.push({
+           type: LINE_COMMENT_TYPE,
+           lineNumber: computeOldLineNumber(change),
+@@ -36,7 +39,7 @@ export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
+           changeType: "delete",
+           properties: { change },
+         });
+-      } else if (isInsert(change)) {
++      } else if (isInsert(change) && !isExpanded) {
+         newRanges.push({
+           type: LINE_COMMENT_TYPE,
+           lineNumber: computeNewLineNumber(change),
+@@ -45,6 +48,24 @@ export const markLineComments = (hunks: HunkData[]): TokenizeEnhancer => {
            changeType: "insert",
            properties: { change },
          });
-+      } else {
++      } else if (!isExpanded) {
 +        newRanges.push({
 +          type: LINE_COMMENT_TYPE,
 +          lineNumber: computeNewLineNumber(change),
@@ -293,30 +670,553 @@ index 91bf226..a33cf62 100644
 +          changeType: "no-changes",
 +          properties: { change },
 +        })
++      } else {
++        newRanges.push({
++          type: LINE_COMMENT_TYPE,
++          lineNumber: computeNewLineNumber(change),
++          start: 0,
++          length: 1,
++          changeType: "explanded",
++          properties: { change },
++        })
        }
      }
    }
+diff --git a/src/DiffFile/types.ts b/src/DiffFile/types.ts
+index 7c4e5cd..3ae754b 100644
+--- a/src/DiffFile/types.ts
++++ b/src/DiffFile/types.ts
+@@ -1 +1,5 @@
++import type { ChangeData } from "react-diff-view";
++
+ export type ChangeKey = string;
++
++export type ExtendedChange = ChangeData & { isExpanded?: boolean };
+\ No newline at end of file
+diff --git a/src/HunkInfo.tsx b/src/HunkInfo.tsx
+new file mode 100644
+index 0000000..fb02c6e
+--- /dev/null
++++ b/src/HunkInfo.tsx
+@@ -0,0 +1,18 @@
++import {
++  Decoration,
++  type DecorationProps,
++  type HunkData,
++} from "react-diff-view";
++
++interface Props extends Omit<DecorationProps, "children"> {
++  hunk: HunkData;
++}
++
++export default function HunkInfo({ hunk, ...props }: Props) {
++  return (
++    <Decoration {...props}>
++      {null}
++      {hunk.content}
++    </Decoration>
++  );
++}
+diff --git a/src/InteractiveLabel.tsx b/src/InteractiveLabel.tsx
+new file mode 100644
+index 0000000..c6424dd
+--- /dev/null
++++ b/src/InteractiveLabel.tsx
+@@ -0,0 +1,51 @@
++import { type HTMLAttributes } from "react";
++import styled from "@emotion/styled";
++import { css } from "@emotion/react";
++
++// eslint-disable-next-line react-refresh/only-export-components
++export const resetAsSpan = css`
++  appearance: none;
++  border: initial;
++  background-color: initial;
++  padding: initial;
++`;
++
++type StateType = "hover" | "active" | "normal";
++
++const colorForState = (state: StateType, disabled: boolean | undefined) => {
++  const colorVarName = `--link-text${
++    state === "normal" ? "" : "-" + state
++  }-color`;
++
++  return disabled ? "var(--disabled-text-color)" : `var(${colorVarName})`;
++};
++
++interface InteractiveProps {
++  disabled?: boolean;
++}
++
++const interactiveAsLink = ({ disabled }: InteractiveProps) => css`
++  color: ${colorForState("normal", disabled)};
++  cursor: ${disabled ? "not-allowed" : "pointer"};
++
++  &:hover {
++    color: ${colorForState("hover", disabled)};
++  }
++
++  &:focus,
++  &:active {
++    color: ${colorForState("active", disabled)};
++  }
++`;
++
++interface Props extends HTMLAttributes<HTMLButtonElement> {
++  disabled?: boolean;
++}
++
++const InteractiveLabel = styled.button<Props>`
++  ${resetAsSpan};
++  ${interactiveAsLink};
++  display: unset;
++`;
++
++export default InteractiveLabel;
+diff --git a/src/Tokenize.ts b/src/Tokenize.ts
+new file mode 100644
+index 0000000..6c0794a
+--- /dev/null
++++ b/src/Tokenize.ts
+@@ -0,0 +1,36 @@
++import { tokenize, markEdits, markWord } from "react-diff-view/tokenize";
++import { compact } from "lodash";
++import refractor from "refractor";
++
++self.addEventListener("message", ({ data: { id, payload } }) => {
++  const { hunks, oldSource, language, editsType } = payload;
++
++  const enhancers = [
++    editsType === "none" ? null : markEdits(hunks, { type: editsType }),
++    markWord("\r", "carriage-return", "␍"),
++    markWord("\t", "tab", "→"),
++  ];
++
++  const options = {
++    highlight: language !== "text",
++    refractor: refractor,
++    language: language,
++    oldSource: oldSource,
++    enhancers: compact(enhancers),
++  };
++
++  try {
++    const tokens = tokenize(hunks, options);
++    const payload = {
++      success: true,
++      tokens: tokens,
++    };
++    self.postMessage({ id, payload });
++  } catch (ex) {
++    const payload = {
++      success: false,
++      reason: ex instanceof Error ? ex.message : `${ex}`,
++    };
++    self.postMessage({ id, payload });
++  }
++});
+diff --git a/src/Unfold.tsx b/src/Unfold.tsx
+new file mode 100644
+index 0000000..a22ff02
+--- /dev/null
++++ b/src/Unfold.tsx
+@@ -0,0 +1,46 @@
++import { createElement, useCallback } from "react";
++import {
++  CaretUpOutlined,
++  CaretDownOutlined,
++  PlusCircleOutlined,
++} from "@ant-design/icons";
++import { Decoration, type DecorationProps } from "react-diff-view";
++// import styles from "./Unfold.less";
++
++const ICON_TYPE_MAPPING = {
++  up: CaretUpOutlined,
++  down: CaretDownOutlined,
++  none: PlusCircleOutlined,
++};
++
++interface Props extends Omit<DecorationProps, "children"> {
++  start: number;
++  end: number;
++  direction: "up" | "down" | "none";
++  onExpand: (start: number, end: number) => void;
++}
++
++export default function Unfold({
++  start,
++  end,
++  direction,
++  onExpand,
++  ...props
++}: Props) {
++  const expand = useCallback(
++    () => onExpand(start, end),
++    [onExpand, start, end]
++  );
++
++  const iconType = ICON_TYPE_MAPPING[direction];
++  const lines = end - start;
++
++  return (
++    <Decoration {...props}>
++      <div className={styles.root} onClick={expand}>
++        {createElement(iconType)}
++        &nbsp;Expand hidden {lines} lines
++      </div>
++    </Decoration>
++  );
++}
+diff --git a/src/UnfoldCollapsed.tsx b/src/UnfoldCollapsed.tsx
+new file mode 100644
+index 0000000..3b0070c
+--- /dev/null
++++ b/src/UnfoldCollapsed.tsx
+@@ -0,0 +1,114 @@
++import { getCollapsedLinesCountBetween, type HunkData } from "react-diff-view";
++import Unfold from "./Unfold";
++
++interface Props {
++  previousHunk: HunkData;
++  currentHunk?: HunkData;
++  linesCount: number;
++  onExpand: (start: number, end: number) => void;
++}
++
++export default function UnfoldCollapsed({
++  previousHunk,
++  currentHunk,
++  linesCount,
++  onExpand,
++}: Props) {
++  if (!currentHunk) {
++    const nextStart = previousHunk.oldStart + previousHunk.oldLines;
++    const collapsedLines = linesCount - nextStart + 1;
++
++    if (collapsedLines <= 0) {
++      return null;
++    }
++
++    return (
++      <>
++        {collapsedLines > 10 && (
++          <Unfold
++            direction="down"
++            start={nextStart}
++            end={nextStart + 10}
++            onExpand={onExpand}
++          />
++        )}
++        <Unfold
++          direction="none"
++          start={nextStart}
++          end={linesCount + 1}
++          onExpand={onExpand}
++        />
++      </>
++    );
++  }
++
++  const collapsedLines = getCollapsedLinesCountBetween(
++    previousHunk,
++    currentHunk
++  );
++
++  if (!previousHunk) {
++    if (!collapsedLines) {
++      return null;
++    }
++
++    const start = Math.max(currentHunk.oldStart - 10, 1);
++
++    return (
++      <>
++        <Unfold
++          direction="none"
++          start={1}
++          end={currentHunk.oldStart}
++          onExpand={onExpand}
++        />
++        {collapsedLines > 10 && (
++          <Unfold
++            direction="up"
++            start={start}
++            end={currentHunk.oldStart}
++            onExpand={onExpand}
++          />
++        )}
++      </>
++    );
++  }
++
++  const collapsedStart = previousHunk.oldStart + previousHunk.oldLines;
++  const collapsedEnd = currentHunk.oldStart;
++
++  if (collapsedLines < 10) {
++    return (
++      <Unfold
++        direction="none"
++        start={collapsedStart}
++        end={collapsedEnd}
++        onExpand={onExpand}
++      />
++    );
++  }
++
++  return (
++    <>
++      {}
++      <Unfold
++        direction="down"
++        start={collapsedStart}
++        end={collapsedStart + 10}
++        onExpand={onExpand}
++      />
++      <Unfold
++        direction="none"
++        start={collapsedStart}
++        end={collapsedEnd}
++        onExpand={onExpand}
++      />
++      <Unfold
++        direction="up"
++        start={collapsedEnd - 10}
++        end={collapsedEnd}
++        onExpand={onExpand}
++      />
++    </>
++  );
++}
+diff --git a/src/baseFile.tsx b/src/baseFile.tsx
+new file mode 100644
+index 0000000..482b0e5
+--- /dev/null
++++ b/src/baseFile.tsx
+@@ -0,0 +1,128 @@
++const baseFile = `
++import { Fragment, useMemo } from "react";
++import {
++  useTokenizeWorker,
++  type FileData,
++  type ViewType,
++  type HunkData,
++  Decoration,
++  Hunk,
++  parseDiff,
++} from "react-diff-view";
++import { Diff } from "react-diff-view";
++import type { RenderToken } from "react-diff-view";
++import { getDefaultTokenizeWorker } from "./tokenizeDefaultDiff";
++import styles from "./DiffFile.module.css";
++import type { ReactNode } from "react";
++
++const getFileExtension = (filePath: string) => {
++  return filePath.split(".").pop() ?? "";
++};
++
++const renderHunk = (hunk: HunkData) => (
++  <Fragment key={hunk.content}>
++    <Decoration className={styles.decoration}>{hunk.content}</Decoration>
++    <Hunk key={hunk.content} hunk={hunk} />
++  </Fragment>
++);
++
++const renderDiffChildren = (hunks: HunkData[]) => hunks.map(renderHunk);
++
++const defaultRenderToken: RenderToken = (token, defaultRender, i) => {
++  if (token.type === "indent-guide") {
++    return (
++      <span key={i} className={styles.indentGuide}>
++        {token.children?.map((child, j) =>
++          defaultRenderToken(child, defaultRender, j)
++        )}
++      </span>
++    );
++  }
++
++  return defaultRender(token, i);
++};
++
++type DiffViewProps =
++  | (DiffViewBaseProps & { diff: string; diffFile?: never })
++  | (DiffViewBaseProps & { diffFile: FileData; diff?: never });
++
++type DiffViewBaseProps = {
++  viewType?: ViewType;
++  enableComments?: boolean;
++  widgets?: Record<string, ReactNode>;
++  renderToken?: RenderToken;
++  tokenizeWorker?: Worker;
++};
++
++export const DiffView = ({
++  diff,
++  diffFile,
++  viewType = "unified",
++  enableComments = false,
++  widgets,
++  renderToken,
++  tokenizeWorker: tokenizeWorkerProp,
++}: DiffViewProps) => {
++  const file = useMemo(() => {
++    if (diffFile) {
++      return diffFile;
++    }
++
++    return parseDiff(diff, { nearbySequences: "zip" })[0];
++  }, [diffFile, diff]);
++  const tokenizeWorker = useMemo(
++    () => tokenizeWorkerProp ?? getDefaultTokenizeWorker(),
++    [tokenizeWorkerProp]
++  );
++  const tokenizePayload = useMemo(
++    () => ({
++      hunks: file.hunks ?? "",
++      oldSource: null,
++      language: getFileExtension(file.newPath ?? ""),
++      enableComments,
++    }),
++    [file.hunks, file.newPath, enableComments]
++  );
++  const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
++
++  if (!file) {
++    return null;
++  }
++
++  const { oldRevision, newRevision, type, hunks } = file;
++
++  return (
++    <Diff
++      key={{oldRevision}-{newRevision}}
++      viewType={viewType}
++      diffType={type}
++      hunks={hunks}
++      tokens={tokens}
++      renderToken={renderToken ?? defaultRenderToken}
++      optimizeSelection
++      className={styles.diff}
++      widgets={widgets}
++    >
++      {renderDiffChildren}
++    </Diff>
++  );
++};
++};
++};
++};
++};
++};
++};
++};
++};
++};
++};
++};
++`
++
++export const lines = baseFile.split("\n");
++lines.pop();
++
++export const getLines = (from: number, to: number) => {
++    return lines.slice(from, to + 1);
++}
+\ No newline at end of file
+diff --git a/src/configuration.tsx b/src/configuration.tsx
+new file mode 100644
+index 0000000..8f87ee7
+--- /dev/null
++++ b/src/configuration.tsx
+@@ -0,0 +1,61 @@
++import {
++  createContext,
++  useState,
++  useMemo,
++  useCallback,
++  type ReactNode,
++} from "react";
++import { type MarkEditsType, type ViewType } from "react-diff-view";
++
++export type AppConfiguration = {
++  viewType: ViewType;
++  editsType: MarkEditsType;
++  language: string;
++};
++
++export type AppConfigurationContextValue = {
++  configuration: AppConfiguration;
++  switchViewType: (value: ViewType) => void;
++};
++
++const DEFAULT_VALUE: AppConfigurationContextValue = {
++  configuration: {
++    viewType: "unified",
++    editsType: "block",
++    language: "text",
++  },
++  switchViewType: () => {},
++};
++
++const DiffFileConfigurationContext = createContext(DEFAULT_VALUE);
++DiffFileConfigurationContext.displayName = "DiffFileConfigurationContext";
++
++type DiffFileProviderProps = {
++  children: ReactNode;
++};
++
++export const DiffFileProvider = ({ children }: DiffFileProviderProps) => {
++  const [configuration, setConfiguration] = useState(
++    DEFAULT_VALUE.configuration
++  );
++
++  const switchViewType = useCallback(
++    (value: ViewType) =>
++      setConfiguration((prev) => ({ ...prev, viewType: value })),
++    []
++  );
++
++  const contextValue = useMemo(
++    () => ({
++      configuration,
++      switchViewType,
++    }),
++    [configuration, switchViewType]
++  );
++
++  return (
++    <DiffFileConfigurationContext.Provider value={contextValue}>
++      {children}
++    </DiffFileConfigurationContext.Provider>
++  );
++};
+diff --git a/src/main.tsx b/src/main.tsx
+new file mode 100644
+index 0000000..bef5202
+--- /dev/null
++++ b/src/main.tsx
+@@ -0,0 +1,10 @@
++import { StrictMode } from 'react'
++import { createRoot } from 'react-dom/client'
++import './index.css'
++import App from './App.tsx'
++
++createRoot(document.getElementById('root')!).render(
++  <StrictMode>
++    <App />
++  </StrictMode>,
++)
 diff --git a/src/textDiffs/reactDiff.ts b/src/textDiffs/reactDiff.ts
-index c376cc3..a1cd0fd 100644
+index c376cc3..3325d5a 100644
 --- a/src/textDiffs/reactDiff.ts
 +++ b/src/textDiffs/reactDiff.ts
-@@ -1,63 +1,400 @@
+@@ -1,63 +1,178 @@
  export const reactDiff = `
 -diff --git a/src/App.tsx b/src/App.tsx
 -index 1111111..3333333 100644
 ---- a/src/App.tsx
 -+++ b/src/App.tsx
-+diff --git a/src/textDiffs/reactDiff.ts b/src/textDiffs/reactDiff.ts
-+index c376cc3..ba9d4ef 100644
-+--- a/src/textDiffs/reactDiff.ts
-++++ b/src/textDiffs/reactDiff.ts
-+@@ -1,63 +1,132 @@
-+ export const reactDiff = 
-+-diff --git a/src/App.tsx b/src/App.tsx
-+-index 1111111..3333333 100644
-+---- a/src/App.tsx
-+-+++ b/src/App.tsx
- @@ -1,6 +1,8 @@
+-@@ -1,6 +1,8 @@
 --import React from 'react';
 -+import React, { useState, useEffect } from 'react';
 - import './App.css';
@@ -352,407 +1252,275 @@ index c376cc3..a1cd0fd 100644
 -+console.log('Line 19');
 -+console.log('Line 20');
 -+
-+--import React from 'react';
-+-+import React, { useState, useEffect } from 'react';
-+- import './App.css';
-++diff --git a/src/DiffFile/DiffView.tsx b/src/DiffFile/DiffView.tsx
-++index fa97fa8..4478d68 100644
-++--- a/src/DiffFile/DiffView.tsx
-+++++ b/src/DiffFile/DiffView.tsx
-+@@ -1,4 +1,4 @@
-++-import { Fragment, useMemo } from "react";
-+++import { Fragment, useMemo, useState } from "react";
-++ import {
-++   useTokenizeWorker,
-++   type FileData,
-+@@ -7,6 +7,8 @@ import {
-++   Decoration,
-++   Hunk,
-++   parseDiff,
-+++  getCollapsedLinesCountBetween,
-+++  expandFromRawCode,
-++ } from "react-diff-view";
-++ import { Diff } from "react-diff-view";
-++ import type { RenderToken } from "react-diff-view";
-+@@ -18,14 +20,72 @@ const getFileExtension = (filePath: string) => {
-++   return filePath.split(".").pop() ?? "";
-++ };
-+
-+--function App() {
-+--  return <div className="App">Hello World</div>;
-+-+function App() {
-+-+  const [count, setCount] = useState(0);
-+-+  return <div className="App">Hello React Diff</div>;
-+- }
-++-const renderHunk = (hunk: HunkData) => (
-++-  <Fragment key={hunk.content}>
-++-    <Decoration className={styles.decoration}>{hunk.content}</Decoration>
-++-    <Hunk key={hunk.content} hunk={hunk} />
-++-  </Fragment>
-++-);
-+++const TOTAL_NUMBER = 100; // TODO: какое-то число от бэка нужно
-+
-+- export default App;
-+-+
-+-+// ===== huge unchanged block =====
-+-+console.log('Line 1');
-+-+console.log('Line 2');
-+-+console.log('Line 3');
-+-+console.log('Line 4');
-+-+console.log('Line 5');
-+-+console.log('Line 6');
-+-+console.log('Line 7');
-+-+console.log('Line 8');
-+-+console.log('Line 9');
-+-+console.log('Line 10');
-+-+console.log('Line 11');
-+-+console.log('Line 12');
-+-+console.log('Line 13');
-+-+console.log('Line 14');
-+-+console.log('Line 15');
-+-+console.log('Line 16');
-+-+console.log('Line 17');
-+-+console.log('Line 18');
-+-+console.log('Line 19');
-+-+console.log('Line 20');
-+-+
- @@ -25,6 +45,10 @@
+-@@ -25,6 +45,10 @@
 -+// ===== second hunk =====
 -+const newFeature = () => {
 -+  console.log('New feature added');
--+};
-+-+// ===== second hunk =====
-+-+const newFeature = () => {
-+-+  console.log('New feature added');
-++-const renderDiffChildren = (hunks: HunkData[]) => hunks.map(renderHunk);
-+++const renderDiffChildren = (hunks: HunkData[], setHunks: (h) => void) => {
-+++  const elements: React.ReactElement[] = [];
-+++
-+++  const expand = (hunk, direction: "up" | "down") => {
-+++    const mockResponse = {
-+++      start: 7,
-+++      end: 9,
-+++      lines: [
-+++        "  # Это скрытая строка 7",
-+++        "  # Это скрытая строка 8",
-+++        "  # Это скрытая строка 9"
-+++      ]
-+++    };
-+++  
-+++    const nextHunks = expandFromRawCode(
-+++      hunks, 
-+++      mockResponse.lines, 
-+++      mockResponse.start, 
-+++      mockResponse.end
-+++    );
-+++
-+++    console.log("[next: ]", nextHunks)
-+++
-+++    setHunks(nextHunks);
-+++  }
-+++
-+++  hunks.forEach((hunk, ind) => {
-+++    if (ind === 0 && hunk.oldStart > 1) {
-+++      elements.push(
-+++        <Decoration key="top-expander">
-+++          <button onClick={() => expand(hunk, "up")}>Развернуть верх</button>
-+++        </Decoration>
-+++      );
-+++    }
-+++
-+++    elements.push(<Fragment key={hunk.content}>
-+++      <Decoration className={styles.decoration}>{hunk.content}</Decoration>
-+++      <Hunk key={hunk.content} hunk={hunk} />
-+++    </Fragment>);
-+++
-+++    const nextHunk = hunks[ind + 1];
-+++
-+++    if (nextHunk) {
-+++      const collapsedCount = getCollapsedLinesCountBetween(hunk, nextHunk);
-+++      if (collapsedCount > 0) {
-+++        elements.push(
-+++          <Decoration key={gap-{ind}}>
-+++            <button onClick={() => expand(hunk, "down")}>
-+++              Развернуть {collapsedCount} строк
-+++            </button>
-+++          </Decoration>
-+++        );
-+++      }
-+++    }
-+++
-+++    if (ind === hunks.length - 1 && hunk.oldStart < TOTAL_NUMBER) {
-+++      elements.push(<Decoration key="top-expander">
-+++        <button onClick={() => expand(hunk, "down")}>Развернуть вниз</button>
-+++      </Decoration>);
-+++    }
-+++  })
-+++
-+++  return elements; 
-+ +};
++diff --git a/src/DiffFile/DiffView.tsx b/src/DiffFile/DiffView.tsx
++index fa97fa8..bb89650 100644
++--- a/src/DiffFile/DiffView.tsx
+++++ b/src/DiffFile/DiffView.tsx
++@@ -1,4 +1,4 @@
++-import { Fragment, useMemo } from "react";
+++import { Fragment, useMemo, useState } from "react";
++ import {
++   useTokenizeWorker,
++   type FileData,
++@@ -7,6 +7,10 @@ import {
++   Decoration,
++   Hunk,
++   parseDiff,
+++  getCollapsedLinesCountBetween,
+++  expandFromRawCode,
+++  textLinesToHunk,
+++  insertHunk,
++ } from "react-diff-view";
++ import { Diff } from "react-diff-view";
++ import type { RenderToken } from "react-diff-view";
++@@ -18,14 +22,101 @@ const getFileExtension = (filePath: string) => {
++   return filePath.split(".").pop() ?? "";
++ };
++ 
++-const renderHunk = (hunk: HunkData) => (
++-  <Fragment key={hunk.content}>
++-    <Decoration className={styles.decoration}>{hunk.content}</Decoration>
++-    <Hunk key={hunk.content} hunk={hunk} />
++-  </Fragment>
++-);
+++type ExpandType = 'up' | 'down' | "up&down" | 'all' | "none";
++ 
++-const renderDiffChildren = (hunks: HunkData[]) => hunks.map(renderHunk);
+++const ExpandButton = ({expand, onClick}: {expand: ExpandType, onClick: (type?: "up" | "down") => void}) => {
+++  if (expand === "up&down") {
+++    return (<div className={styles.decorationGutterButtonsWrapper}>
+++      <button style={{backgroundColor: 'rgb(133, 206, 255)'}} className={styles.decorationGutterButton} onClick={() => onClick("down")}>↓</button>
+++      <button style={{backgroundColor: 'rgb(133, 206, 255)'}} className={styles.decorationGutterButton} onClick={() => onClick("up")}>↑</button>
+++    </div>)
+++  }
+++  if (expand === "up") return <button style={{backgroundColor: 'rgb(133, 206, 255)'}} className={styles.decorationGutterButton} onClick={() => onClick()}>↑</button>;
+++  if (expand === "down") return <button style={{backgroundColor: 'rgb(133, 206, 255)'}} className={styles.decorationGutterButton} onClick={() => onClick()}>↓</button>;
+++  if (expand === "none") return null;
+++  return <button style={{backgroundColor: 'rgb(133, 206, 255)'}} className={styles.decorationGutterButton} onClick={() => onClick()}>↓↑</button>;
+ +};
  +
 -+// ===== another huge unchanged block =====
 -+for (let i = 21; i <= 60; i++) {
 -+  console.log('Line ' + i);
--+}
-++ const defaultRenderToken: RenderToken = (token, defaultRender, i) => {
-++   if (token.type === "indent-guide") {
-+@@ -84,25 +144,24 @@ export const DiffView = ({
-++   );
-++   const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
+++const ExpandedDecoratedHunk = ({hunk, expand, onClick}: {hunk?: HunkData, expand: ExpandType, onClick?: (type?: "up" | "down") => void} ) => {
+++  return (<Fragment>
+++  <Decoration className={styles.decoration} gutterClassName={styles.decorationGutter} contentClassName={styles.decorationContent}>
+++    <ExpandButton expand={expand} onClick={(type) => onClick?.(type)} />
+++    {hunk && hunk.content}
+++  </Decoration>
+++  {hunk && <Hunk key={hunk.content} hunk={hunk} />}
+++</Fragment>)
+ +}
  +
-++-  if (!file) {
-++-    return null;
-++-  }
-++-
-++   const { oldRevision, newRevision, type, hunks } = file;
-+++  const [diffHunks, setHunks] = useState(hunks);
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
- @@ -65,3 +89,7 @@
+-@@ -65,3 +89,7 @@
 --// const oldFeature = () => { console.log('Old feature'); };
 -+// ===== third hunk =====
 -+const finalMessage = 'Diff test completed!';
 -+console.log(finalMessage);
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+-+  console.log('Line ' + i);
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+-+  console.log('Line ' + i);
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+
-+
-+
-+
-+
-+
-+
-+
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+-+  console.log('Line ' + i);
-+
-+
-+
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+
-+
-+
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+
-+
-+
-+
-+
-+
-+-+
-+-@@ -65,3 +89,7 @@
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+
-+
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+ +
-+-+// ===== another huge unchanged block =====
-+-+// ===== another huge unchanged block =====
-+ +
-+ +
-+-+// ===== another huge unchanged block =====
-+-+// ===== another huge unchanged block =====
-+ +
-+ +
-+-+// ===== another huge unchanged block =====
-+-+// ===== another huge unchanged block =====
-+ +
-+ +
-+-+// ===== another huge unchanged block =====
-+-+for (let i = 21; i <= 60; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+-+
-+-@@ -65,3 +89,7 @@
-+--// const oldFeature = () => { console.log('Old feature'); };
-+-+// ===== third hunk =====
-+-+const finalMessage = 'Diff test completed!';
-+-+console.log(finalMessage);
-+-+
-+-+// ===== extra unchanged lines =====
-+-+for (let i = 61; i <= 80; i++) {
-+-+  console.log('Line ' + i);
-+-+}
-+++  console.log("DIFF HUNKS===", diffHunks);
+++const TOTAL_NUMBER = 1000; // TODO: какое-то число от бэка нужно
  +
 -+// ===== extra unchanged lines =====
 -+for (let i = 61; i <= 80; i++) {
 -+  console.log('Line ' + i);
 -+}
-++   return (
-++     <Diff
-++       key={{oldRevision}-{newRevision}}
-++       viewType={viewType}
-++       diffType={type}
-++-      hunks={hunks}
-+++      hunks={diffHunks}
-++       tokens={tokens}
-++       renderToken={renderToken ?? defaultRenderToken}
-++       optimizeSelection
-++       className={styles.diff}
-++       widgets={widgets}
-++     >
-++-      {renderDiffChildren}
-+++      {(hunks) => renderDiffChildren(hunks, setHunks)}
-++     </Diff>
-++   );
-++ };
+++const renderDiffChildren = (hunks: HunkData[], setHunks: (hunk: HunkData) => void) => {
+++  const expand = (start: number, end: number) => {
+++    console.log("DIFF EXPAND REQUEST: ", start, end);
+++    // const mockResponse = {
+++    //   // Начинаем строго со следующей строки после 1-го ханга
+++    //   start: 5, 
+++    //   // Заканчиваем строго перед началом 2-го ханга
+++    //   end: 6,   
+++    //   // Количество строк должно быть ровно 2 (6 - 5 + 1)
+++    //   lines: [
+++    //     "  useTokenizeWorker,", // это реальная 5-я строка из твоего файла
+++    //     "  type FileData,"      // это реальная 6-я строка
+++    //   ]
+++    // };
+++  
+++    // const newHunk = textLinesToHunk(mockResponse.lines, mockResponse.start, mockResponse.start);
+++
+++    // if (newHunk) {
+++    //   const nextHunks = insertHunk(hunks, newHunk)
+++    //   setHunks(nextHunks);
+++    // };
+++  };
+++
+++  const elements = hunks.reduce<React.ReactElement[]>((acc, hunk, ind) => {
+++    if (ind === 0) {
+++      if (hunk.oldStart > 1) {
+++        acc.push(
+++          <ExpandedDecoratedHunk hunk={hunk} expand="up" onClick={() => expand(hunk.oldStart, hunk.oldStart - 20 >= 1 ? hunk.oldStart - 20 : 1)}/>
+++        );
+++      }
+++      else {
+++        acc.push(
+++          <ExpandedDecoratedHunk hunk={hunk} expand="none" />
+++        );
+++      }
+++    }
+++
+++    const prevHunk = hunks[ind - 1]
+++
+++    if (ind > 0 && prevHunk) {
+++      const collapsedCount = getCollapsedLinesCountBetween(prevHunk, hunk);
+++
+++      if (collapsedCount > 0 && collapsedCount <= 20) {
+++        acc.push(
+++          <ExpandedDecoratedHunk hunk={hunk} expand="all" onClick={() => expand(prevHunk.oldStart + prevHunk.oldLines, hunk.oldStart - 1)} />
+++        );
+++      };
+++
+++      if (collapsedCount > 20) {
+++        acc.push(
+++          <ExpandedDecoratedHunk hunk={hunk} expand="up&down" onClick={(type) => {
+++            if (type === "up") expand(hunk.oldStart - 20, hunk.oldStart - 1)
+++            if (type === "down") expand(prevHunk.oldStart + prevHunk.oldLines, prevHunk.oldStart + prevHunk.oldLines + 19);
+++          }} />
+++        );
+++      };
+++    };
+++
+++    if (hunks.length - 1 === ind && hunk.oldStart + hunk.oldLines < TOTAL_NUMBER) {
+++      acc.push(<ExpandedDecoratedHunk expand="down" onClick={() => expand(hunk.oldStart + hunk.oldLines, hunk.oldStart + hunk.oldLines <= TOTAL_NUMBER ?  hunk.oldStart + hunk.oldLines + 19 : TOTAL_NUMBER)}/>)
+++    }
+++
+++    return acc;
+++  }, []);
+++  
+++
+++  return elements;
+++};
++ 
++ const defaultRenderToken: RenderToken = (token, defaultRender, i) => {
++   if (token.type === "indent-guide") {
++@@ -73,36 +164,36 @@ export const DiffView = ({
++     () => tokenizeWorkerProp ?? getDefaultTokenizeWorker(),
++     [tokenizeWorkerProp]
++   );
+++
+++  const { oldRevision, newRevision, type, hunks } = file;
+++  const [diffHunks, setHunks] = useState(hunks);
+++
++   const tokenizePayload = useMemo(
++     () => ({
++-      hunks: file.hunks ?? "",
+++      hunks: diffHunks ?? "",
++       oldSource: null,
++       language: getFileExtension(file.newPath ?? ""),
++       enableComments,
++     }),
++-    [file.hunks, file.newPath, enableComments]
+++    [diffHunks, file.newPath, enableComments]
++   );
++   const { tokens } = useTokenizeWorker(tokenizeWorker, tokenizePayload);
++ 
++-  if (!file) {
++-    return null;
++-  }
++-
++-  const { oldRevision, newRevision, type, hunks } = file;
+++  console.log("DIFF HUNKS===", diffHunks);
++ 
++   return (
++     <Diff
++       key={{oldRevision}-{newRevision}}
++       viewType={viewType}
++       diffType={type}
++-      hunks={hunks}
+++      hunks={diffHunks}
++       tokens={tokens}
++       renderToken={renderToken ?? defaultRenderToken}
++       optimizeSelection
++       className={styles.diff}
++       widgets={widgets}
++     >
++-      {renderDiffChildren}
+++      {(diffHunks) => renderDiffChildren(diffHunks, setHunks)}
++     </Diff>
++   );
++ };
  `;
+diff --git a/src/useSelection.ts b/src/useSelection.ts
+new file mode 100644
+index 0000000..1cf08a4
+--- /dev/null
++++ b/src/useSelection.ts
+@@ -0,0 +1,73 @@
++import { type MouseEvent, useCallback, useMemo, useState } from "react";
++import {
++  type ChangeEventArgs,
++  getChangeKey,
++  type HunkData,
++} from "react-diff-view";
++
++interface Selection {
++  start: string | null;
++  end: string | null;
++}
++
++interface InlineState {
++  inSelection: boolean;
++  keys: string[];
++}
++
++export const useSelection = (hunks: HunkData[]) => {
++  const [{ start, end }, setSelection] = useState<Selection>({
++    start: null,
++    end: null,
++  });
++  const [currentHunks, setCurrentHunks] = useState(hunks);
++  const select = useCallback(
++    ({ change }: ChangeEventArgs, e: MouseEvent<HTMLElement>) => {
++      if (!change) {
++        return;
++      }
++
++      const key = getChangeKey(change);
++      if (e.shiftKey && start) {
++        setSelection((v) => ({ start: v.start, end: key }));
++      } else {
++        setSelection({ start: key, end: key });
++      }
++    },
++    [start]
++  );
++  const selected = useMemo(() => {
++    if (!start || !end) {
++      return [];
++    }
++
++    if (start === end) {
++      return [start];
++    }
++
++    // Find all changes from start to end in all hunks
++    const state: InlineState = {
++      inSelection: false,
++      keys: [],
++    };
++    for (const hunk of currentHunks) {
++      for (const change of hunk.changes) {
++        const key = getChangeKey(change);
++        if (key === start || key === end) {
++          state.keys.push(key);
++          state.inSelection = !state.inSelection;
++        } else if (state.inSelection) {
++          state.keys.push(key);
++        }
++      }
++    }
++    return state.keys;
++  }, [currentHunks, end, start]);
++
++  if (hunks !== currentHunks) {
++    setSelection({ start: null, end: null });
++    setCurrentHunks(hunks);
++  }
++
++  return [selected, select] as const;
++};
